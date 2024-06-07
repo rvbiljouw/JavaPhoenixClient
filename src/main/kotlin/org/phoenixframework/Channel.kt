@@ -94,8 +94,8 @@ class Channel(
   internal var timeout: Long
 
   /** Params passed in through constructions and provided to the JoinPush */
-  var params: Payload
-    get() = joinPush.payload
+  var params: JsonPayload
+    get() = joinPush.payload as JsonPayload
     set(value) {
       joinPush.payload = value
     }
@@ -123,7 +123,7 @@ class Channel(
 
   constructor(
     topic: String,
-    params: Payload,
+    params: JsonPayload,
     socket: Socket
   ) : this(topic, { params }, socket)
 
@@ -211,7 +211,7 @@ class Channel(
     // Handles an error, attempts to rejoin
     this.onError {
       // Log that the channel received an error
-      this.socket.logItems("Channel: error $topic ${it.payload}")
+      this.socket.logItems("Channel: error $topic ${it.json}")
 
       // If error was received while joining, then reset the Push
       if (isJoining) {
@@ -230,7 +230,7 @@ class Channel(
 
     // Perform when the join reply is received
     this.on(Event.REPLY) { message ->
-      this.trigger(replyEventName(message.ref), message.rawPayload, message.ref, message.joinRef, message.payloadJson)
+      this.trigger(replyEventName(message.ref), message.payload, message.ref, message.joinRef, message.payloadJson)
     }
   }
 
@@ -347,7 +347,7 @@ class Channel(
     // Perform the same behavior if the channel leaves successfully or not
     val onClose: ((Message) -> Unit) = {
       this.socket.logItems("Channel: leave $topic")
-      this.trigger(Event.CLOSE, mapOf("reason" to "leave"))
+      this.trigger(Event.CLOSE, mapOf("reason" to "leave").toPayload())
     }
 
     // Push event to send to the server
@@ -362,7 +362,7 @@ class Channel(
     leavePush.send()
 
     // If the Channel cannot send push events, trigger a success locally
-    if (!canPush) leavePush.trigger("ok", hashMapOf())
+    if (!canPush) leavePush.trigger("ok", JsonPayload())
 
     return leavePush
   }
@@ -387,7 +387,7 @@ class Channel(
 
   internal fun trigger(
     event: Event,
-    payload: Payload = hashMapOf(),
+    payload: Payload,
     ref: String = "",
     joinRef: String? = null,
     payloadJson: String = ""
@@ -397,7 +397,7 @@ class Channel(
 
   internal fun trigger(
     event: String,
-    payload: Payload = hashMapOf(),
+    payload: Payload? = null,
     ref: String = "",
     joinRef: String? = null,
     payloadJson: String = ""

@@ -24,34 +24,47 @@ package org.phoenixframework
 
 
 data class Message(
-  /** The ref sent during a join event. Empty if not present. */
-  val joinRef: String? = null,
+    /** The ref sent during a join event. Empty if not present. */
+    val joinRef: String? = null,
 
-  /** The unique string ref. Empty if not present */
-  val ref: String = "",
+    /** The unique string ref. Empty if not present */
+    val ref: String = "",
 
-  /** The message topic */
-  val topic: String = "",
+    /** The message topic */
+    val topic: String = "",
 
-  /** The message event name, for example "phx_join" or any other custom name */
-  val event: String = "",
+    /** The message event name, for example "phx_join" or any other custom name */
+    val event: String = "",
 
-  /** The raw payload of the message. It is recommended that you use `payload` instead. */
-  internal val rawPayload: Payload = HashMap(),
+    /** The raw payload of the message. It is recommended that you use `payload` instead. */
+    internal val payload: Payload? = null,
 
-  /** The payload, as a json string */
-  val payloadJson: String = ""
+    /** The payload, as a json string */
+    val payloadJson: String = ""
 ) {
 
-  /** The payload of the message */
-  @Suppress("UNCHECKED_CAST")
-  val payload: Payload
-    get() = rawPayload["response"] as? Payload ?: rawPayload
+    /** The payload of the message */
+    @Suppress("UNCHECKED_CAST")
+    val json: Map<String, Any>?
+        get() {
+            val jsonPayload = payload.takeIf { it is JsonPayload } as JsonPayload?
+            println(jsonPayload)
+            return jsonPayload?.body?.get("response") as? Map<String, Any> ?: jsonPayload?.body
+        }
 
-  /**
-   * Convenience var to access the message's payload's status. Equivalent
-   * to checking message.payload["status"] yourself
-   */
-  val status: String?
-    get() = rawPayload["status"] as? String
+    val binary: BinaryPayload?
+        get() {
+            val binaryPayload = payload.takeIf { it is BinaryPayload } as BinaryPayload?
+            return binaryPayload
+        }
+
+    /**
+     * Convenience var to access the message's payload's status. Equivalent
+     * to checking message.payload["status"] yourself
+     */
+    val status: String?
+        get() {
+            val jsonPayload = payload.takeIf { it is JsonPayload } as JsonPayload?
+            return jsonPayload?.body?.get("status") as? String
+        }
 }

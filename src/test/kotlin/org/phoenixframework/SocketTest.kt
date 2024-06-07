@@ -243,8 +243,8 @@ class SocketTest {
       val data = listOf(null, null, "topic", "event", mapOf("go" to true))
 
       val json = Defaults.gson.toJson(data)
-      socket.connection?.onMessage?.invoke(json)
-      assertThat(lastMessage?.payload).isEqualTo(mapOf("go" to true))
+      socket.connection?.onJsonMessage?.invoke(json)
+      assertThat(lastMessage?.json).isEqualTo(mapOf("go" to true))
     }
 
     @Test
@@ -281,8 +281,8 @@ class SocketTest {
       val data = listOf(null, null, "topic", "event", mapOf("go" to true))
 
       val json = Defaults.gson.toJson(data)
-      socket.connection?.onMessage?.invoke(json)
-      assertThat(lastMessage?.payload).isNull()
+      socket.connection?.onJsonMessage?.invoke(json)
+      assertThat(lastMessage?.json).isNull()
     }
 
     @Test
@@ -953,7 +953,7 @@ class SocketTest {
       socket.channels = socket.channels.minus(otherChannel)
 
       val rawMessage = "[null,null,\"topic\",\"event\",{\"one\":\"two\",\"status\":\"ok\"}]"
-      socket.onConnectionMessage(rawMessage)
+      socket.onConnectionJsonMessage(rawMessage)
 
       verify(targetChannel).trigger(message = any())
       verify(otherChannel, never()).trigger(message = any())
@@ -965,7 +965,7 @@ class SocketTest {
       socket.onMessage { message = it }
 
       val rawMessage = "[null,null,\"topic\",\"event\",{\"one\":\"two\",\"status\":\"ok\"}]"
-      socket.onConnectionMessage(rawMessage)
+      socket.onConnectionJsonMessage(rawMessage)
 
       assertThat(message?.topic).isEqualTo("topic")
       assertThat(message?.event).isEqualTo("event")
@@ -976,7 +976,7 @@ class SocketTest {
       socket.pendingHeartbeatRef = "5"
 
       val rawMessage = "[null,\"5\",\"topic\",\"event\",{\"one\":\"two\",\"status\":\"ok\"}]"
-      socket.onConnectionMessage(rawMessage)
+      socket.onConnectionJsonMessage(rawMessage)
       assertThat(socket.pendingHeartbeatRef).isNull()
     }
 
@@ -1051,11 +1051,11 @@ class SocketTest {
       }
 
       val message = "[null,null,\"room:lobby\",\"shout\",{\"message\":\"Hi\",\"name\":\"Tester\"}]"
-      socket.onConnectionMessage(message)
+      socket.onConnectionJsonMessage(message)
       assertThat(oneCalled).isEqualTo(1)
       assertThat(twoCalled).isEqualTo(0)
 
-      socket.onConnectionMessage(message)
+      socket.onConnectionJsonMessage(message)
       assertThat(oneCalled).isEqualTo(2)
       assertThat(twoCalled).isEqualTo(1)
     }

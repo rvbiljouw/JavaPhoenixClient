@@ -28,6 +28,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okio.ByteString
 import java.net.URL
 
 object Defaults {
@@ -65,8 +66,7 @@ object Defaults {
    * into a Message object.
    */
   @Suppress("UNCHECKED_CAST")
-  val decode: DecodeClosure = { rawMessage ->
-
+  val decodeJson: JsonDecodeClosure = { rawMessage ->
     val parseValue: (String) -> String? = { value ->
       when(value) {
         "null" -> null
@@ -111,7 +111,7 @@ object Defaults {
       ref = parseValue(ref) ?: "",
       topic = parseValue(topic) ?: "",
       event = parseValue(event) ?: "",
-      rawPayload = result,
+      payload=result.toPayload(),
       payloadJson = payload
     )
   }
@@ -120,7 +120,7 @@ object Defaults {
    * Default JSON encoder, backed by GSON, that takes a Map<String, Any> and
    * converts it into a JSON String.
    */
-  val encode: EncodeClosure = { payload ->
+  val encode: EncodeJsonClosure = { payload ->
     gson.toJson(payload)
   }
 
@@ -152,7 +152,7 @@ object Defaults {
     httpBuilder.addQueryParameter("vsn", vsn)
 
     // Append any additional query params
-    paramsClosure.invoke().forEach { (key, value) ->
+    (paramsClosure.invoke() as JsonPayload).body.forEach { (key, value) ->
       httpBuilder.addQueryParameter(key, value.toString())
     }
 

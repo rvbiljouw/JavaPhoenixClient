@@ -71,7 +71,7 @@ class Push(
     /** The event the Push is targeting */
     event: String,
     /** The message to be sent */
-    payload: Payload = mapOf(),
+    payload: Payload = JsonPayload(),
     /** Duration before the message is considered timed out and failed to send */
     timeout: Long = Defaults.TIMEOUT
   ) : this(channel, event, { payload }, timeout)
@@ -157,12 +157,12 @@ class Push(
   /**
    * Triggers an event to be sent through the Push's parent Channel
    */
-  internal fun trigger(status: String, payload: Payload) {
+  internal fun trigger(status: String, jsonPayload: JsonPayload) {
     this.refEvent?.let { refEvent ->
-      val mutPayload = payload.toMutableMap()
+      val mutPayload = jsonPayload.body.toMutableMap()
       mutPayload["status"] = status
 
-      this.channel.trigger(refEvent, mutPayload)
+      this.channel.trigger(refEvent, jsonPayload.copy(body = mutPayload))
     }
   }
 
@@ -192,7 +192,7 @@ class Push(
 
     // Setup and start the Timer
     this.timeoutTask = channel.socket.dispatchQueue.queue(timeout, TimeUnit.MILLISECONDS) {
-      this.trigger("timeout", hashMapOf())
+      this.trigger("timeout", JsonPayload())
     }
   }
 

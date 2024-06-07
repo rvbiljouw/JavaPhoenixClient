@@ -49,12 +49,12 @@ internal class DefaultsTest {
       [null,null,"room:lobby","shout",{"message":"Hi","name":"Tester"}]
     """.trimIndent()
 
-    val message = Defaults.decode(v2Json)
+    val message = Defaults.decodeJson(v2Json)
     assertThat(message.joinRef).isNull()
     assertThat(message.ref).isEqualTo("")
     assertThat(message.topic).isEqualTo("room:lobby")
     assertThat(message.event).isEqualTo("shout")
-    assertThat(message.payload).isEqualTo(mapOf("message" to "Hi", "name" to "Tester"))
+    assertThat(message.json).isEqualTo(mapOf("message" to "Hi", "name" to "Tester"))
   }
 
   @Test
@@ -63,13 +63,13 @@ internal class DefaultsTest {
       ["1","2","room:lobby","shout",{"message":"Hi","name":"Tester","count":15,"ratio":0.2}]
     """.trimIndent()
 
-    val message = Defaults.decode(v2Json)
+    val message = Defaults.decodeJson(v2Json)
     assertThat(message.joinRef).isEqualTo("1")
     assertThat(message.ref).isEqualTo("2")
     assertThat(message.topic).isEqualTo("room:lobby")
     assertThat(message.event).isEqualTo("shout")
     assertThat(message.payloadJson).isEqualTo("{\"message\":\"Hi\",\"name\":\"Tester\",\"count\":15,\"ratio\":0.2}")
-    assertThat(message.payload).isEqualTo(mapOf(
+    assertThat(message.json).isEqualTo(mapOf(
       "message" to "Hi",
       "name" to "Tester",
       "count" to 15.0, // Note that this is a bug and should eventually be removed
@@ -83,13 +83,13 @@ internal class DefaultsTest {
       ["1","2","room:lobby","phx_reply",{"response":{"message":"Hi","name":"Tester","count":15,"ratio":0.2},"status":"ok"}]
     """.trimIndent()
 
-    val message = Defaults.decode(v2Json)
+    val message = Defaults.decodeJson(v2Json)
     assertThat(message.joinRef).isEqualTo("1")
     assertThat(message.ref).isEqualTo("2")
     assertThat(message.topic).isEqualTo("room:lobby")
     assertThat(message.event).isEqualTo("phx_reply")
     assertThat(message.payloadJson).isEqualTo("{\"message\":\"Hi\",\"name\":\"Tester\",\"count\":15,\"ratio\":0.2}")
-    assertThat(message.payload).isEqualTo(mapOf(
+    assertThat(message.json).isEqualTo(mapOf(
       "message" to "Hi",
       "name" to "Tester",
       "count" to 15.0, // Note that this is a bug and should eventually be removed
@@ -105,15 +105,15 @@ internal class DefaultsTest {
       ["6","8","drivers:self","phx_reply",{"response":{"details":"invalid code specified"},"status":"error"}]
     """.trimIndent()
 
-    val message = Defaults.decode(v2Json)
+    val message = Defaults.decodeJson(v2Json)
     assertThat(message.payloadJson).isEqualTo("{\"details\":\"invalid code specified\"}")
-    assertThat(message.rawPayload).isEqualTo(mapOf(
+    assertThat(message.json).isEqualTo(mapOf(
       "response" to mapOf(
         "details" to "invalid code specified"
       ),
       "status" to "error"
     ))
-    assertThat(message.payload).isEqualTo(mapOf(
+    assertThat(message.json).isEqualTo(mapOf(
       "details" to "invalid code specified"
     ))
 
@@ -125,9 +125,9 @@ internal class DefaultsTest {
       ["1","2","room:lobby","phx_reply",{"response":"hello","status":"ok"}]
     """.trimIndent()
 
-    val message = Defaults.decode(v2Json)
+    val message = Defaults.decodeJson(v2Json)
     assertThat(message.payloadJson).isEqualTo("\"hello\"")
-    assertThat(message.payload).isEqualTo(mapOf(
+    assertThat(message.json).isEqualTo(mapOf(
       "response" to "hello",
       "status" to "ok"
     ))

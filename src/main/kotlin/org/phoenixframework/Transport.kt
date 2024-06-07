@@ -27,6 +27,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString
 import java.net.URL
 
 /**
@@ -60,8 +61,10 @@ interface Transport {
   var onOpen: (() -> Unit)?
   /** Called when the Transport receives an error */
   var onError: ((Throwable, Response?) -> Unit)?
+  /** Called each time the Transport receives a JSON message */
+  var onJsonMessage: ((String) -> Unit)?
   /** Called each time the Transport receives a message */
-  var onMessage: ((String) -> Unit)?
+  var onBinaryMessage: ((ByteString) -> Unit)?
   /** Called when the Transport closes */
   var onClose: ((Int) -> Unit)?
 
@@ -81,6 +84,11 @@ interface Transport {
    * Sends text to the Server
    */
   fun send(data: String)
+
+  /**
+   * Sends binary data to the Server
+   */
+  fun send(bytes: ByteString)
 }
 
 /**
@@ -102,7 +110,8 @@ class WebSocketTransport(
   override var readyState: Transport.ReadyState = Transport.ReadyState.CLOSED
   override var onOpen: (() -> Unit)? = null
   override var onError: ((Throwable, Response?) -> Unit)? = null
-  override var onMessage: ((String) -> Unit)? = null
+  override var onJsonMessage: ((String) -> Unit)? = null
+  override var onBinaryMessage: ((ByteString) -> Unit)? = null
   override var onClose: ((Int) -> Unit)? = null
 
   override fun connect() {
@@ -118,6 +127,10 @@ class WebSocketTransport(
 
   override fun send(data: String) {
     connection?.send(data)
+  }
+
+  override fun send(bytes: ByteString) {
+    connection?.send(bytes)
   }
 
   //------------------------------------------------------------------------------
@@ -159,7 +172,11 @@ class WebSocketTransport(
   }
 
   override fun onMessage(webSocket: WebSocket, text: String) {
-    this.onMessage?.invoke(text)
+    this.onJsonMessage?.invoke(text)
+  }
+
+  override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+    this.onBinaryMessage?.invoke(bytes)
   }
 
   override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {

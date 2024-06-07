@@ -24,11 +24,13 @@ package org.phoenixframework
 
 import okhttp3.OkHttpClient
 import okhttp3.Response
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import java.net.URL
+import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
-/** Alias for a JSON mapping */
-typealias Payload = Map<String, Any?>
+typealias SendAction = (transport: Transport) -> Unit
 
 /** Data class that holds callbacks assigned to the socket */
 internal class StateChangeCallbacks {
@@ -103,10 +105,10 @@ const val WS_CLOSE_ABNORMAL = 1006
 typealias PayloadClosure = () -> Payload
 
 /** A closure that will encode a Map<String, Any> into a JSON String */
-typealias EncodeClosure = (Any) -> String
+typealias EncodeJsonClosure = (Any) -> String
 
 /** A closure that will decode a JSON String into a [Message] */
-typealias DecodeClosure = (String) -> Message
+typealias JsonDecodeClosure = (String) -> Message
 
 
 /**
@@ -124,16 +126,16 @@ typealias DecodeClosure = (String) -> Message
  * @param url Url to connect to such as https://example.com/socket
  * @param paramsClosure Closure which allows to change parameters sent during connection.
  * @param vsn JSON Serializer version to use. Defaults to 2.0.0
- * @param encode Optional. Provide a custom JSON encoding implementation
- * @param decode Optional. Provide a custom JSON decoding implementation
+ * @param encodeJson Optional. Provide a custom JSON encoding implementation
+ * @param decodeJson Optional. Provide a custom JSON decoding implementation
  * @param client Default OkHttpClient to connect with. You can provide your own if needed.
  */
 class Socket(
   url: String,
   val paramsClosure: PayloadClosure,
   val vsn: String = Defaults.VSN,
-  private val encode: EncodeClosure = Defaults.encode,
-  private val decode: DecodeClosure = Defaults.decode,
+  private val encodeJson: EncodeJsonClosure = Defaults.encode,
+  private val decodeJson: JsonDecodeClosure = Defaults.decodeJson,
   private val client: OkHttpClient = OkHttpClient.Builder().build()
 ) {
 
@@ -242,10 +244,10 @@ class Socket(
    */
   constructor(
     url: String,
-    params: Payload = mapOf(),
+    params: JsonPayload = JsonPayload(),
     vsn: String = Defaults.VSN,
-    encode: EncodeClosure = Defaults.encode,
-    decode: DecodeClosure = Defaults.decode,
+    encode: EncodeJsonClosure = Defaults.encode,
+    decode: JsonDecodeClosure = Defaults.decodeJson,
     client: OkHttpClient = OkHttpClient.Builder().build()
   ) : this(url, { params }, vsn, encode, decode, client)
 
@@ -318,7 +320,8 @@ class Socket(
     this.connection?.onOpen = { onConnectionOpened() }
     this.connection?.onClose = { code -> onConnectionClosed(code) }
     this.connection?.onError = { t, r -> onConnectionError(t, r) }
-    this.connection?.onMessage = { m -> onConnectionMessage(m) }
+    this.connection?.onJsonMessage = { m -> onConnectionJsonMessage(m) }
+    this.connection?.onBinaryMessage = { m -> onConnectionBinaryMessage(m) }
     this.connection?.connect()
   }
 
@@ -357,7 +360,7 @@ class Socket(
 
   fun channel(
     topic: String,
-    params: Payload = mapOf()
+    params: JsonPayload = JsonPayload()
   ): Channel = this.channel(topic) { params }
 
   fun channel(
@@ -401,11 +404,37 @@ class Socket(
   ) {
 
     val callback: (() -> Unit) = {
-      val body = listOf(joinRef, ref, topic, event, payload)
-      val data = this.encode(body)
+      val sendAction: SendAction = when(payload) {
+        is JsonPayload ->  { transport ->
+          val data = listOf(joinRef, ref, topic, event, payload).let(encodeJson)
+          this.logItems("Push: Sending $data")
+          transport.send(data)
+        }
+
+        is BinaryPayload -> { transport ->
+            val topicBytes = topic.encodeToByteArray()
+            val eventBytes = event.encodeToByteArray()
+            val payloadBytes = payload.body.toByteArray()
+
+            val buffer = ByteBuffer.allocate(4 + topicBytes.size + 4 + eventBytes.size + payloadBytes.size)
+          buffer.put(0x2)
+            buffer.put(topicBytes.size.toByte())
+            buffer.put(eventBytes.size.toByte())
+            buffer.put(topicBytes)
+            buffer.put(eventBytes)
+            buffer.put(payloadBytes)
+
+            val data = buffer.array().toByteString()
+            this.logItems("Push: Sending $data")
+            transport.send(data)
+        }
+
+        else ->
+          throw IllegalStateException("Payload must be a JsonPayload or BinaryPayload.")
+      }
+
       connection?.let { transport ->
-        this.logItems("Push: Sending $data")
-        transport.send(data)
+        sendAction.invoke(transport)
       }
     }
 
@@ -525,7 +554,7 @@ class Socket(
     this.push(
       topic = "phoenix",
       event = Channel.Event.HEARTBEAT.value,
-      payload = mapOf(),
+      payload = JsonPayload(),
       ref = pendingHeartbeatRef
     )
   }
@@ -580,16 +609,44 @@ class Socket(
     this.stateChangeCallbacks.close.forEach { it.second.invoke() }
   }
 
-  internal fun onConnectionMessage(rawMessage: String) {
+  internal fun onConnectionJsonMessage(rawMessage: String) {
     this.logItems("Receive: $rawMessage")
 
     // Parse the message as JSON
-    val message = this.decode(rawMessage)
+    val message = this.decodeJson(rawMessage)
 
     // Clear heartbeat ref, preventing a heartbeat timeout disconnect
     if (message.ref == pendingHeartbeatRef) pendingHeartbeatRef = null
 
-    // Dispatch the message to all channels that belong to the topic
+    propagateMessage(message)
+  }
+
+  internal fun onConnectionBinaryMessage(rawMessage: ByteString) {
+    this.logItems("Receive: $rawMessage")
+
+    val buffer = rawMessage.asByteBuffer()
+    // first byte is a version or something
+    buffer.get()
+
+    val topicLength = buffer.get().toInt()
+    val eventLength = buffer.get().toInt()
+
+    val topicBuffer = ByteArray(topicLength)
+    buffer.get(topicBuffer)
+    val room = String(topicBuffer, Charsets.UTF_8)
+
+    val eventBuffer = ByteArray(eventLength)
+    buffer.get(eventBuffer)
+    val event = String(eventBuffer, Charsets.UTF_8)
+
+    val binaryPayloadBuffer = ByteArray(buffer.remaining())
+    buffer.get(binaryPayloadBuffer)
+
+    val message = Message(topic = room, event = event, payload=BinaryPayload(binaryPayloadBuffer.toByteString()))
+    propagateMessage(message)
+  }
+
+  private fun propagateMessage(message: Message) {
     this.channels
       .filter { it.isMember(message) }
       .forEach { it.trigger(message) }

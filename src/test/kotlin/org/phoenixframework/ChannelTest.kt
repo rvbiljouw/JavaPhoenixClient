@@ -32,8 +32,8 @@ class ChannelTest {
 
   private val kDefaultRef = "1"
   private val kDefaultTimeout = 10_000L
-  private val kDefaultPayload: Payload = mapOf("one" to "two")
-  private val kEmptyPayload: Payload = mapOf()
+  private val kDefaultJsonPayload: JsonPayload = mapOf("one" to "two")
+  private val kEmptyJsonPayload: JsonPayload = mapOf()
 
   lateinit var fakeClock: ManualDispatchQueue
   lateinit var channel: Channel
@@ -50,7 +50,7 @@ class ChannelTest {
     whenever(socket.reconnectAfterMs).thenReturn(Defaults.reconnectSteppedBackOff)
     whenever(socket.rejoinAfterMs).thenReturn(Defaults.rejoinSteppedBackOff)
 
-    channel = Channel("topic", kDefaultPayload, socket)
+    channel = Channel("topic", kDefaultJsonPayload, socket)
   }
 
   @AfterEach
@@ -184,7 +184,7 @@ class ChannelTest {
     internal fun setUp() {
       socket = spy(Socket(url = "https://localhost:4000/socket", client = okHttpClient))
       socket.dispatchQueue = fakeClock
-      channel = Channel("topic", kDefaultPayload, socket)
+      channel = Channel("topic", kDefaultJsonPayload, socket)
     }
 
     @Test
@@ -220,7 +220,7 @@ class ChannelTest {
     @Test
     internal fun `triggers socket push with channel params`() {
       channel.join()
-      verify(socket).push("topic", "phx_join", kDefaultPayload, "3", channel.joinRef)
+      verify(socket).push("topic", "phx_join", kDefaultJsonPayload, "3", channel.joinRef)
     }
 
     @Test
@@ -246,7 +246,7 @@ class ChannelTest {
         assertThat(channel.isJoined).isFalse()
       }
 
-      channel.joinPush.trigger("ok", kEmptyPayload)
+      channel.joinPush.trigger("ok", kEmptyJsonPayload)
     }
 
     @Nested
@@ -278,7 +278,7 @@ class ChannelTest {
 
         fakeClock.tick(100)
 
-        joinPush.trigger("ok", kEmptyPayload)
+        joinPush.trigger("ok", kEmptyJsonPayload)
         assertThat(channel.state).isEqualTo(Channel.State.JOINED)
 
         fakeClock.tick(timeout)
@@ -307,7 +307,7 @@ class ChannelTest {
         verify(mockCallback, times(2)).invoke(any())
 
         fakeClock.tick(10_000)
-        joinPush.trigger("ok", kEmptyPayload)
+        joinPush.trigger("ok", kEmptyJsonPayload)
         verify(socket, times(3)).push(any(), eq("phx_join"), any(), any(), any())
         assertThat(channel.state).isEqualTo(Channel.State.JOINED)
       }
@@ -329,7 +329,7 @@ class ChannelTest {
 
         assertThat(channel.state).isEqualTo(Channel.State.ERRORED)
         this.receiveSocketOpen()
-        joinPush.trigger("ok", kEmptyPayload)
+        joinPush.trigger("ok", kEmptyJsonPayload)
 
         fakeClock.tick(1_000)
         assertThat(channel.state).isEqualTo(Channel.State.JOINED)
@@ -351,9 +351,9 @@ class ChannelTest {
         // open socket after delay
         fakeClock.tick(5_000)
         this.receiveSocketOpen()
-        joinPush.trigger("ok", kEmptyPayload)
+        joinPush.trigger("ok", kEmptyJsonPayload)
 
-        joinPush.trigger("ok", kEmptyPayload)
+        joinPush.trigger("ok", kEmptyJsonPayload)
         assertThat(channel.state).isEqualTo(Channel.State.JOINED)
       }
 
@@ -390,7 +390,7 @@ class ChannelTest {
 
       whenever(socket.isConnected).thenReturn(true)
 
-      channel = Channel("topic", kDefaultPayload, socket)
+      channel = Channel("topic", kDefaultJsonPayload, socket)
       joinPush = channel.joinPush
 
       channel.join()
@@ -471,7 +471,7 @@ class ChannelTest {
         assertThat(joinPush.receivedMessage).isNull()
 
         receivesOk()
-        assertThat(joinPush.receivedMessage?.payload).isEqualTo(mapOf("status" to "ok", "a" to "b"))
+        assertThat(joinPush.receivedMessage?.json).isEqualTo(mapOf("status" to "ok", "a" to "b"))
         assertThat(joinPush.receivedMessage?.status).isEqualTo("ok")
       }
 
@@ -573,7 +573,7 @@ class ChannelTest {
         joinPush.receive("error", mockCallback)
 
         receivesError()
-        joinPush.trigger("error", kEmptyPayload)
+        joinPush.trigger("error", kEmptyJsonPayload)
         verify(mockCallback, times(1)).invoke(any())
       }
 
@@ -626,7 +626,7 @@ class ChannelTest {
         receivesError()
         assertThat(joinPush.receivedMessage).isNotNull()
         assertThat(joinPush.receivedMessage?.status).isEqualTo("error")
-        assertThat(joinPush.receivedMessage?.payload?.get("a")).isEqualTo("b")
+        assertThat(joinPush.receivedMessage?.json?.get("a")).isEqualTo("b")
       }
 
       @Test
@@ -668,7 +668,7 @@ class ChannelTest {
         joinPush.receive(mockStatusCallback)
 
         receivesError()
-        joinPush.trigger("error", kEmptyPayload)
+        joinPush.trigger("error", kEmptyJsonPayload)
         verify(mockStatusCallback, times(1)).invoke(any(), any())
       }
 
@@ -687,7 +687,7 @@ class ChannelTest {
         joinPush.receive(mockStatusCallback)
 
         receivesApproved()
-        joinPush.trigger("approved", kEmptyPayload)
+        joinPush.trigger("approved", kEmptyJsonPayload)
         verify(mockStatusCallback, times(1)).invoke(any(), any())
 
       }
@@ -721,11 +721,11 @@ class ChannelTest {
 
       whenever(socket.isConnected).thenReturn(true)
 
-      channel = Channel("topic", kDefaultPayload, socket)
+      channel = Channel("topic", kDefaultJsonPayload, socket)
       joinPush = channel.joinPush
 
       channel.join()
-      joinPush.trigger("ok", kEmptyPayload)
+      joinPush.trigger("ok", kEmptyJsonPayload)
     }
 
 
@@ -758,7 +758,7 @@ class ChannelTest {
 
     @Test
     internal fun `removes the joinPush message from sendBuffer`() {
-      val channel = Channel("topic", kDefaultPayload, socket)
+      val channel = Channel("topic", kDefaultJsonPayload, socket)
       val push = mock<Push>()
       whenever(push.ref).thenReturn("10")
       channel.joinPush = push
@@ -819,7 +819,7 @@ class ChannelTest {
     @Test
     internal fun `triggers additional callbacks after join`() {
       channel.onError(mockCallback)
-      joinPush.trigger("ok", kEmptyPayload)
+      joinPush.trigger("ok", kEmptyJsonPayload)
 
       assertThat(channel.state).isEqualTo(Channel.State.JOINED)
       verifyNoInteractions(mockCallback)
@@ -845,7 +845,7 @@ class ChannelTest {
 
       whenever(socket.isConnected).thenReturn(true)
 
-      channel = Channel("topic", kDefaultPayload, socket)
+      channel = Channel("topic", kDefaultJsonPayload, socket)
       joinPush = channel.joinPush
 
       channel.join()
@@ -1019,7 +1019,7 @@ class ChannelTest {
 
     @Test
     internal fun `sends push event when successfully joined`() {
-      channel.join().trigger("ok", kEmptyPayload)
+      channel.join().trigger("ok", kEmptyJsonPayload)
       channel.push("event", mapOf("foo" to "bar"))
 
       verify(socket).push("topic", "event", mapOf("foo" to "bar"), channel.joinRef, kDefaultRef)
@@ -1033,7 +1033,7 @@ class ChannelTest {
       verify(socket, never()).push(any(), any(), eq(mapOf("foo" to "bar")), any(), any())
 
       fakeClock.tick(channel.timeout / 2)
-      joinPush.trigger("ok", kEmptyPayload)
+      joinPush.trigger("ok", kEmptyJsonPayload)
 
       verify(socket).push(any(), any(), eq(mapOf("foo" to "bar")), any(), any())
     }
@@ -1046,14 +1046,14 @@ class ChannelTest {
       verify(socket, never()).push(any(), any(), eq(mapOf("foo" to "bar")), any(), any())
 
       fakeClock.tick(channel.timeout * 2)
-      joinPush.trigger("ok", kEmptyPayload)
+      joinPush.trigger("ok", kEmptyJsonPayload)
 
       verify(socket, never()).push(any(), any(), eq(mapOf("foo" to "bar")), any(), any())
     }
 
     @Test
     internal fun `uses channel timeout by default`() {
-      channel.join().trigger("ok", kEmptyPayload)
+      channel.join().trigger("ok", kEmptyJsonPayload)
       channel
           .push("event", mapOf("foo" to "bar"))
           .receive("timeout", mockCallback)
@@ -1067,7 +1067,7 @@ class ChannelTest {
 
     @Test
     internal fun `accepts timeout arg`() {
-      channel.join().trigger("ok", kEmptyPayload)
+      channel.join().trigger("ok", kEmptyJsonPayload)
       channel
           .push("event", mapOf("foo" to "bar"), channel.timeout * 2)
           .receive("timeout", mockCallback)
@@ -1081,7 +1081,7 @@ class ChannelTest {
 
     @Test
     internal fun `does not time out after receiving 'ok'`() {
-      channel.join().trigger("ok", kEmptyPayload)
+      channel.join().trigger("ok", kEmptyJsonPayload)
       val push = channel
           .push("event", mapOf("foo" to "bar"), channel.timeout * 2)
           .receive("timeout", mockCallback)
@@ -1089,7 +1089,7 @@ class ChannelTest {
       fakeClock.tick(channel.timeout / 2)
       verifyNoInteractions(mockCallback)
 
-      push.trigger("ok", kEmptyPayload)
+      push.trigger("ok", kEmptyJsonPayload)
 
       fakeClock.tick(channel.timeout)
       verifyNoInteractions(mockCallback)
@@ -1099,7 +1099,7 @@ class ChannelTest {
     internal fun `throws if channel has not been joined`() {
       var exceptionThrown = false
       try {
-        channel.push("event", kEmptyPayload)
+        channel.push("event", kEmptyJsonPayload)
       } catch (e: Exception) {
         exceptionThrown = true
         assertThat(e.message).isEqualTo(
@@ -1118,7 +1118,7 @@ class ChannelTest {
     @BeforeEach
     internal fun setUp() {
       whenever(socket.isConnected).thenReturn(true)
-      channel.join().trigger("ok", kEmptyPayload)
+      channel.join().trigger("ok", kEmptyJsonPayload)
     }
 
     @Test
@@ -1131,13 +1131,13 @@ class ChannelTest {
 
     @Test
     internal fun `closes channel on 'ok' from server`() {
-      channel.leave().trigger("ok", kEmptyPayload)
+      channel.leave().trigger("ok", kEmptyJsonPayload)
       verify(socket).remove(channel)
     }
 
     @Test
     internal fun `sets state to closed on 'ok' event`() {
-      channel.leave().trigger("ok", kEmptyPayload)
+      channel.leave().trigger("ok", kEmptyJsonPayload)
       assertThat(channel.state).isEqualTo(Channel.State.CLOSED)
     }
 

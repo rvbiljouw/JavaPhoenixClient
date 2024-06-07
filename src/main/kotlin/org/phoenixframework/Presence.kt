@@ -126,7 +126,7 @@ class Presence(channel: Channel, opts: Options = Options.defaults) {
     if (stateEvent != null && diffEvent != null) {
 
       this.channel.on(stateEvent) { message ->
-        val newState = message.rawPayload.toMutableMap() as PresenceState
+        val newState = message.json?.toMutableMap() as PresenceState
 
         this.joinRef = this.channel.joinRef
         this.state =
@@ -142,7 +142,7 @@ class Presence(channel: Channel, opts: Options = Options.defaults) {
       }
 
       this.channel.on(diffEvent) { message ->
-        val diff = message.rawPayload.toMutableMap() as PresenceDiff
+        val diff = message.json?.toMutableMap() as PresenceDiff
         if (isPendingSyncState) {
           this.pendingDiffs.add(diff)
         } else {

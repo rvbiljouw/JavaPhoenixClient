@@ -149,7 +149,7 @@ class WebSocketTransportTest {
     @Test
     internal fun `invokes onMessage closure`() {
       val mockClosure = mock<(String) -> Unit>()
-      transport.onMessage = mockClosure
+      transport.onJsonMessage = mockClosure
 
       transport.onMessage(mockWebSocket, "text")
       verify(mockClosure).invoke("text")
