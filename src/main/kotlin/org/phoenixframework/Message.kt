@@ -48,7 +48,6 @@ data class Message(
     val json: Map<String, Any>?
         get() {
             val jsonPayload = payload.takeIf { it is JsonPayload } as JsonPayload?
-            println(jsonPayload)
             return jsonPayload?.body?.get("response") as? Map<String, Any> ?: jsonPayload?.body
         }
 

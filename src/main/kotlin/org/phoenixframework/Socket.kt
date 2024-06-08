@@ -26,6 +26,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Response
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
+import java.io.ByteArrayOutputStream
 import java.net.URL
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
@@ -412,23 +413,27 @@ class Socket(
                 }
 
                 is BinaryPayload -> { transport ->
+                    val joinRefBytes = joinRef?.encodeToByteArray() ?: ByteArray(0)
+                    val refBytes = ref?.encodeToByteArray() ?: ByteArray(0)
                     val topicBytes = topic.encodeToByteArray()
                     val eventBytes = event.encodeToByteArray()
                     val payloadBytes = payload.body.toByteArray()
+                    println(payloadBytes.toByteString())
 
-                    val buffer = ByteBuffer.allocate(4 + topicBytes.size + 4 + eventBytes.size + payloadBytes.size)
-                    buffer.put(0x0) // push
-                    buffer.put(joinRef?.length?.toByte() ?: 0)
-                    buffer.put(ref?.length?.toByte() ?: 0)
-                    buffer.put(topicBytes.size.toByte())
-                    buffer.put(eventBytes.size.toByte())
-                    buffer.put(joinRef?.toByteArray() ?: ByteArray(0))
-                    buffer.put(ref?.toByteArray() ?: ByteArray(0))
-                    buffer.put(topicBytes)
-                    buffer.put(eventBytes)
-                    buffer.put(payloadBytes)
+                    val buffer = ByteArrayOutputStream()
 
-                    val data = buffer.array().toByteString()
+                    buffer.write(0x0) // push
+                    buffer.write(joinRefBytes.size)
+                    buffer.write(refBytes.size)
+                    buffer.write(topicBytes.size)
+                    buffer.write(eventBytes.size)
+                    buffer.write(joinRefBytes)
+                    buffer.write(refBytes)
+                    buffer.write(topicBytes)
+                    buffer.write(eventBytes)
+                    buffer.write(payloadBytes)
+
+                    val data = buffer.toByteArray().toByteString()
                     this.logItems("Push: Sending $data")
                     transport.send(data)
                 }
