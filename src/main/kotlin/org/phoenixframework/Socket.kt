@@ -418,7 +418,6 @@ class Socket(
                     val topicBytes = topic.encodeToByteArray()
                     val eventBytes = event.encodeToByteArray()
                     val payloadBytes = payload.body.toByteArray()
-                    println(payloadBytes.toByteString())
 
                     val buffer = ByteArrayOutputStream()
 
