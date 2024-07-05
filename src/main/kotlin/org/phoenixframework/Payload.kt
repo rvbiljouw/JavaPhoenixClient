@@ -6,7 +6,7 @@ import okio.ByteString.Companion.toByteString
 interface Payload {
 }
 
-data class JsonPayload(val body: Map<String, Any> = emptyMap()) : Payload
+data class JsonPayload(val body: Map<String, Any?> = emptyMap()) : Payload
 
 data class BinaryPayload(val body: ByteString) : Payload
 

@@ -45,10 +45,10 @@ data class Message(
 
     /** The payload of the message */
     @Suppress("UNCHECKED_CAST")
-    val json: Map<String, Any>?
+    val json: Map<String, Any?>?
         get() {
             val jsonPayload = payload.takeIf { it is JsonPayload } as JsonPayload?
-            return jsonPayload?.body?.get("response") as? Map<String, Any> ?: jsonPayload?.body
+            return jsonPayload?.body?.get("response") as? Map<String, Any?> ?: jsonPayload?.body
         }
 
     val binary: BinaryPayload?
